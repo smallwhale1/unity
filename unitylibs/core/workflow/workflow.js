@@ -49,7 +49,13 @@ class WfInitiator {
     };
   }
 
-  async init(el, project = 'unity', unityLibs = '/unitylibs', langRegion = '', langCode = '') {
+  async init(
+    el,
+    project = 'unity',
+    unityLibs = '/unitylibs',
+    langRegion = '',
+    langCode = ''
+  ) {
     setUnityLibs(unityLibs, project);
     this.el = el;
     this.unityLibs = unityLibs;
@@ -59,44 +65,84 @@ class WfInitiator {
     this.workflowCfg.langRegion = langRegion;
     this.workflowCfg.langCode = langCode;
     // eslint-disable-next-line max-len
-    const { targetConfigCallRes: tcfg, spriteCallRes: spriteSvg } = await WfInitiator.priorityLibFetch(this.workflowCfg.name);
-    [this.targetBlock, this.interactiveArea, this.targetConfig] = await this.getTarget(tcfg);
+    const { targetConfigCallRes: tcfg, spriteCallRes: spriteSvg } =
+      await WfInitiator.priorityLibFetch(this.workflowCfg.name);
+    [this.targetBlock, this.interactiveArea, this.targetConfig] =
+      await this.getTarget(tcfg);
     this.getEnabledFeatures();
     this.callbackMap = {};
     this.workflowCfg.targetCfg = this.targetConfig;
     if (this.targetConfig.renderWidget) {
-      const { default: UnityWidget } = await import(`${getUnityLibs()}/core/workflow/${this.workflowCfg.name}/widget.js`);
+      // Load CDN prompt bar script before creating widget
+      await this.loadCDNScript();
+      const { default: UnityWidget } = await import(
+        `${getUnityLibs()}/core/workflow/${this.workflowCfg.name}/widget.js`
+      );
       const spriteContent = await spriteSvg.text();
       this.actionMap = await new UnityWidget(
         this.interactiveArea,
         this.el,
         this.workflowCfg,
-        spriteContent,
+        spriteContent
       ).initWidget();
     } else {
       this.actionMap = this.targetConfig.actionMap;
     }
-    const { default: ActionBinder } = await import(`${getUnityLibs()}/core/workflow/${this.workflowCfg.name}/action-binder.js`);
+    const { default: ActionBinder } = await import(
+      `${getUnityLibs()}/core/workflow/${
+        this.workflowCfg.name
+      }/action-binder.js`
+    );
     await new ActionBinder(
       this.el,
       this.workflowCfg,
       this.targetBlock,
       this.interactiveArea,
-      this.actionMap,
+      this.actionMap
     ).initActionListeners();
   }
 
   checkRenderStatus(block, selector, res, rej, etime, rtime) {
-    if (etime > 20000) { rej(); return; }
+    if (etime > 20000) {
+      rej();
+      return;
+    }
     if (block.querySelector(selector)) res();
-    else setTimeout(() => this.checkRenderStatus(block, selector, res, rej, etime + rtime), rtime);
+    else
+      setTimeout(
+        () => this.checkRenderStatus(block, selector, res, rej, etime + rtime),
+        rtime
+      );
   }
 
   intEnbReendered(block, selector) {
     return new Promise((res, rej) => {
       try {
         this.checkRenderStatus(block, selector, res, rej, 0, 100);
-      } catch (err) { rej(); }
+      } catch (err) {
+        rej();
+      }
+    });
+  }
+
+  async loadCDNScript() {
+    return new Promise((resolve) => {
+      // if (window.customElements?.get('firefly-prompt-bar-app')) {
+      //   resolve(true);
+      //   return;
+      // }
+
+      const scriptUrl =
+        'https://clio-assets-stage.corp.adobe.com/clio-playground/script-cache/prompt-bar-app/v0/dist/main.bundle.js';
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        console.error('Failed to load CDN prompt bar script');
+        resolve(false);
+      };
+      document.head.appendChild(script);
     });
   }
 
@@ -133,7 +179,8 @@ class WfInitiator {
   static getImgSrc(pic) {
     const viewport = defineDeviceByScreenSize();
     let source = '';
-    if (viewport === 'MOBILE') source = pic.querySelector('source[type="image/webp"]:not([media])');
+    if (viewport === 'MOBILE')
+      source = pic.querySelector('source[type="image/webp"]:not([media])');
     else source = pic.querySelector('source[type="image/webp"][media]');
     return source ? source.srcset : pic.querySelector('img').src;
   }
@@ -240,30 +287,45 @@ class WfInitiator {
 
   getEnabledFeatures() {
     const { supportedFeatures, supportedTexts } = this.workflowCfg;
-    const verbWidget = this.el.closest('.section')?.querySelector('.verb-widget');
+    const verbWidget = this.el
+      .closest('.section')
+      ?.querySelector('.verb-widget');
     if (verbWidget) {
-      const verb = [...verbWidget.classList].find((cn) => supportedFeatures.has(cn));
+      const verb = [...verbWidget.classList].find((cn) =>
+        supportedFeatures.has(cn)
+      );
       if (verb) this.workflowCfg.enabledFeatures.push(verb);
     }
-    const configuredFeatures = this.el.querySelectorAll(':scope > div > div > ul > li > span.icon');
+    const configuredFeatures = this.el.querySelectorAll(
+      ':scope > div > div > ul > li > span.icon'
+    );
     configuredFeatures.forEach((cf) => {
       const cfName = [...cf.classList].find((cn) => cn.match('icon-'));
       if (!cfName) return;
       const fn = cfName.trim().replace('icon-', '');
       if (supportedFeatures.has(fn)) {
-        if (!this.workflowCfg.enabledFeatures.includes(fn)) this.workflowCfg.enabledFeatures.push(fn);
+        if (!this.workflowCfg.enabledFeatures.includes(fn))
+          this.workflowCfg.enabledFeatures.push(fn);
         this.workflowCfg.featureCfg.push(cf.closest('li'));
       } else if (fn.includes('error')) {
         this.workflowCfg.errors[fn] = cf.closest('li').innerText;
       } else if (supportedTexts && supportedTexts.has(fn)) {
-        this.workflowCfg.supportedTexts[fn] = this.workflowCfg.supportedTexts[fn] || [];
+        this.workflowCfg.supportedTexts[fn] =
+          this.workflowCfg.supportedTexts[fn] || [];
         this.workflowCfg.supportedTexts[fn].push(cf.closest('li').innerText);
       }
     });
   }
 }
 
-export default async function init(el, project = 'unity', unityLibs = '/unitylibs', unityVersion = 'v2', langRegion = 'us', langCode = 'en') {
+export default async function init(
+  el,
+  project = 'unity',
+  unityLibs = '/unitylibs',
+  unityVersion = 'v2',
+  langRegion = 'us',
+  langCode = 'en'
+) {
   const { imsClientId } = getConfig();
   if (imsClientId) unityConfig.apiKey = imsClientId;
   setUnityLibs(unityLibs, project);
