@@ -28,23 +28,64 @@ export default class UnityWidget {
   }
 
   async initWidget() {
-    const [widgetWrap, widget, unitySprite] = ['ex-unity-wrap', 'ex-unity-widget', 'unity-sprite-container']
-      .map((c) => createTag('div', { class: c }));
+    const [widgetWrap, widget] = ['ex-unity-wrap', 'ex-unity-widget'].map((c) =>
+      createTag('div', { class: c })
+    );
     this.widgetWrap = widgetWrap;
     this.widget = widget;
+
+    // if (window.customElements && window.customElements.get('firefly-prompt-bar-app')) {
+    // Use CDN widget
+    const args = {
+      // Add configuration here if needed
+      // host: { /* ... */ },
+      // persistName: 'unity-prompt-bar',
+      // environment: { /* ... */ },
+      // features: { /* ... */ },
+    };
+
+    const promptBarHTML = [
+      '<sp-theme theme="light" scale="medium"><firefly-prompt-bar-app',
+      args.host !== undefined ? ` host='${JSON.stringify(args.host)}'` : '',
+      args.persistName !== undefined
+        ? ` persistName="${args.persistName}"`
+        : '',
+      args.environment !== undefined
+        ? ` environment='${JSON.stringify(args.environment)}'`
+        : '',
+      args.features !== undefined
+        ? ` features='${JSON.stringify(args.features)}'`
+        : '',
+      '></firefly-prompt-bar-app></sp-theme>',
+    ].join('');
+
+    this.widget.innerHTML = promptBarHTML;
+    this.addWidget();
+    if (this.workflowCfg.targetCfg.floatPrompt) this.initIO();
+    return this.workflowCfg.targetCfg.actionMap;
+    // }
+
+    // Fallback to existing custom widget
+    const unitySprite = createTag('div', { class: 'unity-sprite-container' });
     unitySprite.innerHTML = this.spriteCon;
     this.widgetWrap.append(unitySprite);
     this.workflowCfg.placeholder = this.popPlaceholders();
-    const hasPromptPlaceholder = !!this.el.querySelector('.icon-placeholder-prompt');
-    const hasSuggestionsPlaceholder = !!this.el.querySelector('.icon-placeholder-suggestions');
+    const hasPromptPlaceholder = !!this.el.querySelector(
+      '.icon-placeholder-prompt'
+    );
+    const hasSuggestionsPlaceholder = !!this.el.querySelector(
+      '.icon-placeholder-suggestions'
+    );
     const hasModels = !!this.el.querySelector('[class*="icon-model"]');
     this.hasModelOptions = hasModels;
-    this.hasPromptSuggestions = hasPromptPlaceholder && hasSuggestionsPlaceholder;
+    this.hasPromptSuggestions =
+      hasPromptPlaceholder && hasSuggestionsPlaceholder;
     if (this.hasModelOptions) await this.getModel();
     const inputWrapper = this.createInpWrap(this.workflowCfg.placeholder);
     await this.ensureSoundModuleLoaded();
     let dropdown = null;
-    if (this.hasPromptSuggestions) dropdown = await this.genDropdown(this.workflowCfg.placeholder);
+    if (this.hasPromptSuggestions)
+      dropdown = await this.genDropdown(this.workflowCfg.placeholder);
     const comboboxContainer = createTag('div', { class: 'autocomplete' });
     comboboxContainer.append(inputWrapper);
     if (dropdown) comboboxContainer.append(dropdown);
@@ -61,16 +102,21 @@ export default class UnityWidget {
       augmentSound(this);
       this.soundAugmented = true;
     } catch (e) {
-      window.lana?.log(`Message: Error loading sound module, Error: ${e}`, this.lanaOptions);
+      window.lana?.log(
+        `Message: Error loading sound module, Error: ${e}`,
+        this.lanaOptions
+      );
     }
   }
 
   popPlaceholders() {
     return Object.fromEntries(
-      [...this.el.querySelectorAll('[class*="placeholder"]')].map((element) => [
-        element.classList[1]?.replace('icon-', '') || '',
-        element.closest('li')?.innerText || '',
-      ]).filter(([key]) => key),
+      [...this.el.querySelectorAll('[class*="placeholder"]')]
+        .map((element) => [
+          element.classList[1]?.replace('icon-', '') || '',
+          element.closest('li')?.innerText || '',
+        ])
+        .filter(([key]) => key)
     );
   }
 
@@ -79,12 +125,18 @@ export default class UnityWidget {
     document.querySelectorAll('.verbs-container').forEach((container) => {
       if (container !== menuContainer) {
         container.classList.remove('show-menu');
-        container.querySelector('.selected-verb')?.setAttribute('aria-expanded', 'false');
+        container
+          .querySelector('.selected-verb')
+          ?.setAttribute('aria-expanded', 'false');
       }
     });
     menuContainer.classList.toggle('show-menu');
-    selectedElement.setAttribute('aria-expanded', menuContainer.classList.contains('show-menu') ? 'true' : 'false');
-    if (selectedElement.nextElementSibling.hasAttribute('style')) selectedElement.nextElementSibling.removeAttribute('style');
+    selectedElement.setAttribute(
+      'aria-expanded',
+      menuContainer.classList.contains('show-menu') ? 'true' : 'false'
+    );
+    if (selectedElement.nextElementSibling.hasAttribute('style'))
+      selectedElement.nextElementSibling.removeAttribute('style');
   }
 
   hidePromptDropdown(exceptElement = null) {
@@ -99,13 +151,21 @@ export default class UnityWidget {
     }
     const modelDropdown = this.widget.querySelector('.models-container');
     const modelButton = modelDropdown?.querySelector('.selected-model');
-    if (modelDropdown && modelDropdown.classList.contains('show-menu') && modelButton !== exceptElement) {
+    if (
+      modelDropdown &&
+      modelDropdown.classList.contains('show-menu') &&
+      modelButton !== exceptElement
+    ) {
       modelDropdown.classList.remove('show-menu');
       modelButton?.setAttribute('aria-expanded', 'false');
     }
     const verbDropdown = this.widget.querySelector('.verbs-container');
     const verbButton = verbDropdown?.querySelector('.selected-verb');
-    if (verbDropdown && verbDropdown.classList.contains('show-menu') && verbButton !== exceptElement) {
+    if (
+      verbDropdown &&
+      verbDropdown.classList.contains('show-menu') &&
+      verbButton !== exceptElement
+    ) {
       verbDropdown.classList.remove('show-menu');
       verbButton?.setAttribute('aria-expanded', 'false');
     }
@@ -115,7 +175,10 @@ export default class UnityWidget {
     if (this.promptItems && this.promptItems.length > 0) {
       this.promptItems.forEach((item) => {
         const ariaLabel = item.getAttribute('aria-label') || '';
-        item.setAttribute('daa-ll', `${ariaLabel.slice(0, 20)}--${verb}--Prompt suggestion`);
+        item.setAttribute(
+          'daa-ll',
+          `${ariaLabel.slice(0, 20)}--${verb}--Prompt suggestion`
+        );
       });
     }
     if (this.genBtn) {
@@ -130,7 +193,14 @@ export default class UnityWidget {
     this.selectedModelText = '';
   }
 
-  handleVerbLinkClick(link, verbList, selectedElement, menuIcon, inputPlaceHolder, modelList) {
+  handleVerbLinkClick(
+    link,
+    verbList,
+    selectedElement,
+    menuIcon,
+    inputPlaceHolder,
+    modelList
+  ) {
     return (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -143,7 +213,12 @@ export default class UnityWidget {
       });
       verbLinkTexts.sort((a, b) => b.length - a.length);
       selectedElement.parentElement.classList.toggle('show-menu');
-      selectedElement.setAttribute('aria-expanded', selectedElement.parentElement.classList.contains('show-menu') ? 'true' : 'false');
+      selectedElement.setAttribute(
+        'aria-expanded',
+        selectedElement.parentElement.classList.contains('show-menu')
+          ? 'true'
+          : 'false'
+      );
       link.parentElement.classList.add('selected');
       link.setAttribute('aria-selected', 'true');
       if (modelList) {
@@ -155,7 +230,8 @@ export default class UnityWidget {
         copiedNodes[0].remove();
         selectedElement.replaceChildren(...copiedNodes, menuIcon);
         selectedElement.dataset.selectedModelId = this.selectedModelId;
-        selectedElement.dataset.selectedModelVersion = this.selectedModelVersion;
+        selectedElement.dataset.selectedModelVersion =
+          this.selectedModelVersion;
       } else {
         this.selectedVerbType = link.getAttribute('data-verb-type');
         this.selectedVerbText = link.textContent.trim();
@@ -164,15 +240,24 @@ export default class UnityWidget {
       }
       selectedElement.focus();
       this.ensureSoundModuleLoaded();
-      const verbsWithoutPromptSuggestions = this.workflowCfg.targetCfg?.verbsWithoutPromptSuggestions ?? [];
-      if (!verbsWithoutPromptSuggestions.includes(this.selectedVerbType)) this.updateDropdownForVerb(this.selectedVerbType);
-      else this.widgetWrap.dispatchEvent(new CustomEvent('firefly-reinit-action-listeners'));
+      const verbsWithoutPromptSuggestions =
+        this.workflowCfg.targetCfg?.verbsWithoutPromptSuggestions ?? [];
+      if (!verbsWithoutPromptSuggestions.includes(this.selectedVerbType))
+        this.updateDropdownForVerb(this.selectedVerbType);
+      else
+        this.widgetWrap.dispatchEvent(
+          new CustomEvent('firefly-reinit-action-listeners')
+        );
       if (link.getAttribute('data-model-module') !== this.selectedVerbType) {
-        const oldModelContainer = this.widget.querySelector('.models-container');
+        const oldModelContainer =
+          this.widget.querySelector('.models-container');
         const modelDropdown = this.modelDropdown();
         if (oldModelContainer) {
           if (modelDropdown.length > 1) {
-            const newModelContainer = createTag('div', { class: 'models-container', 'aria-label': 'Model options' });
+            const newModelContainer = createTag('div', {
+              class: 'models-container',
+              'aria-label': 'Model options',
+            });
             newModelContainer.append(...modelDropdown);
             oldModelContainer.replaceWith(newModelContainer);
           } else {
@@ -180,18 +265,30 @@ export default class UnityWidget {
             this.clearSelectedModelState();
           }
         } else if (modelDropdown.length > 1) {
-          const actionContainer = this.widget.querySelector('.action-container');
+          const actionContainer =
+            this.widget.querySelector('.action-container');
           if (actionContainer) {
-            const newModelContainer = createTag('div', { class: 'models-container', 'aria-label': 'Prompt options' });
+            const newModelContainer = createTag('div', {
+              class: 'models-container',
+              'aria-label': 'Prompt options',
+            });
             newModelContainer.append(...modelDropdown);
             actionContainer.append(newModelContainer);
           }
         } else this.clearSelectedModelState();
       }
       this.widgetWrap.setAttribute('data-selected-verb', this.selectedVerbType);
-      if (this.selectedModelId) this.widgetWrap.setAttribute('data-selected-model-id', this.selectedModelId);
+      if (this.selectedModelId)
+        this.widgetWrap.setAttribute(
+          'data-selected-model-id',
+          this.selectedModelId
+        );
       else this.widgetWrap.removeAttribute('data-selected-model-id');
-      if (this.selectedModelVersion) this.widgetWrap.setAttribute('data-selected-model-version', this.selectedModelVersion);
+      if (this.selectedModelVersion)
+        this.widgetWrap.setAttribute(
+          'data-selected-model-version',
+          this.selectedModelVersion
+        );
       else this.widgetWrap.removeAttribute('data-selected-model-version');
       this.updateAnalytics(this.selectedVerbType);
       if (this.genBtn) {
@@ -200,41 +297,56 @@ export default class UnityWidget {
           'aria-label',
           (this.genBtn.getAttribute('aria-label') || '').replace(
             new RegExp(`\\b(${verbLinkTexts.join('|')})\\b`),
-            this.selectedVerbText,
-          ),
+            this.selectedVerbText
+          )
         );
-        if (img) img.setAttribute('alt', `${this.genBtn.getAttribute('aria-label') || ''}`);
+        if (img)
+          img.setAttribute(
+            'alt',
+            `${this.genBtn.getAttribute('aria-label') || ''}`
+          );
       }
     };
   }
 
-  createDropdownItems(items, listContainer, selectedElement, menuIcon, inputPlaceHolder, isModelList) {
+  createDropdownItems(
+    items,
+    listContainer,
+    selectedElement,
+    menuIcon,
+    inputPlaceHolder,
+    isModelList
+  ) {
     const fragment = document.createDocumentFragment();
     items.forEach((item, idx) => {
-      const {
-        name,
-        type,
-        icon,
-        module,
-        id,
-        version,
-      } = item;
+      const { name, type, icon, module, id, version } = item;
       const listItem = createTag('li', {
         class: 'verb-item',
         role: 'presentation',
       });
-      const selectedIcon = createTag('span', { class: 'selected-icon' }, '<svg><use xlink:href="#unity-checkmark-icon"></use></svg>');
-      const nameContainer = isModelList && createTag('span', { class: 'model-name' }, name.trim());
-      const link = createTag('a', {
-        href: '#',
-        class: isModelList ? 'verb-link model-link' : 'verb-link',
-        ...(!isModelList && { 'data-verb-type': type }),
-        ...(isModelList && { 'data-model-module': module }),
-        ...(isModelList && { 'data-model-id': id }),
-        ...(isModelList && { 'data-model-version': version }),
-        'aria-selected': 'false',
-        role: 'option',
-      }, `<img loading="lazy" src="${icon}" alt="" />${nameContainer ? nameContainer.outerHTML : name}`);
+      const selectedIcon = createTag(
+        'span',
+        { class: 'selected-icon' },
+        '<svg><use xlink:href="#unity-checkmark-icon"></use></svg>'
+      );
+      const nameContainer =
+        isModelList && createTag('span', { class: 'model-name' }, name.trim());
+      const link = createTag(
+        'a',
+        {
+          href: '#',
+          class: isModelList ? 'verb-link model-link' : 'verb-link',
+          ...(!isModelList && { 'data-verb-type': type }),
+          ...(isModelList && { 'data-model-module': module }),
+          ...(isModelList && { 'data-model-id': id }),
+          ...(isModelList && { 'data-model-version': version }),
+          'aria-selected': 'false',
+          role: 'option',
+        },
+        `<img loading="lazy" src="${icon}" alt="" />${
+          nameContainer ? nameContainer.outerHTML : name
+        }`
+      );
       if (idx === 0) {
         listItem.classList.add('selected');
         link.setAttribute('aria-selected', 'true');
@@ -247,25 +359,37 @@ export default class UnityWidget {
     listContainer.addEventListener('click', (e) => {
       const link = e.target.closest('.verb-link');
       if (!link) return;
-      this.handleVerbLinkClick(link, listContainer, selectedElement, menuIcon, inputPlaceHolder, isModelList)(e);
+      this.handleVerbLinkClick(
+        link,
+        listContainer,
+        selectedElement,
+        menuIcon,
+        inputPlaceHolder,
+        isModelList
+      )(e);
     });
   }
 
   verbDropdown() {
     const verbs = this.el.querySelectorAll('[class*="icon-verb"]');
-    const inputPlaceHolder = this.el.querySelector('.icon-placeholder-input').parentElement.textContent;
+    const inputPlaceHolder = this.el.querySelector('.icon-placeholder-input')
+      .parentElement.textContent;
     const selectedVerbType = verbs[0]?.className.split('-')[2];
     const selectedVerb = verbs[0]?.nextElementSibling;
-    const selectedElement = createTag('button', {
-      class: 'selected-verb',
-      'aria-expanded': 'false',
-      'aria-controls': 'media-menu',
-      'aria-label': 'media type',
-      'aria-haspopup': 'listbox',
-      role: 'combobox',
-      'aria-labelledby': 'listbox-label',
-      'data-selected-verb': selectedVerbType,
-    }, `${selectedVerb?.textContent.trim()}`);
+    const selectedElement = createTag(
+      'button',
+      {
+        class: 'selected-verb',
+        'aria-expanded': 'false',
+        'aria-controls': 'media-menu',
+        'aria-label': 'media type',
+        'aria-haspopup': 'listbox',
+        role: 'combobox',
+        'aria-labelledby': 'listbox-label',
+        'data-selected-verb': selectedVerbType,
+      },
+      `${selectedVerb?.textContent.trim()}`
+    );
     this.selectedVerbType = selectedVerbType;
     this.widgetWrap.setAttribute('data-selected-verb', this.selectedVerbType);
     this.selectedVerbText = selectedVerb?.textContent.trim();
@@ -274,8 +398,17 @@ export default class UnityWidget {
       return [selectedElement];
     }
     this.widgetWrap.classList.add('verb-options');
-    const menuIcon = createTag('span', { class: 'menu-icon' }, '<svg><use xlink:href="#unity-chevron-icon"></use></svg>');
-    const verbList = createTag('ul', { class: 'verb-list', id: 'media-menu', role: 'listbox', 'aria-labelledby': 'listbox-label' });
+    const menuIcon = createTag(
+      'span',
+      { class: 'menu-icon' },
+      '<svg><use xlink:href="#unity-chevron-icon"></use></svg>'
+    );
+    const verbList = createTag('ul', {
+      class: 'verb-list',
+      id: 'media-menu',
+      role: 'listbox',
+      'aria-labelledby': 'listbox-label',
+    });
     verbList.setAttribute('style', 'display: none;');
     selectedElement.append(menuIcon);
     const handleDocumentClick = (e) => {
@@ -286,12 +419,16 @@ export default class UnityWidget {
         selectedElement.setAttribute('aria-expanded', 'false');
       }
     };
-    selectedElement.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.hidePromptDropdown(selectedElement);
-      this.showVerbMenu(selectedElement);
-      document.addEventListener('click', handleDocumentClick);
-    }, true);
+    selectedElement.addEventListener(
+      'click',
+      (e) => {
+        e.stopPropagation();
+        this.hidePromptDropdown(selectedElement);
+        this.showVerbMenu(selectedElement);
+        document.addEventListener('click', handleDocumentClick);
+      },
+      true
+    );
     selectedElement.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         this.hidePromptDropdown(selectedElement);
@@ -308,40 +445,73 @@ export default class UnityWidget {
       type: verb.classList[1].split('-')[2],
       icon: verb.nextElementSibling?.href,
     }));
-    this.createDropdownItems(verbsData, verbList, selectedElement, menuIcon, inputPlaceHolder, false);
+    this.createDropdownItems(
+      verbsData,
+      verbList,
+      selectedElement,
+      menuIcon,
+      inputPlaceHolder,
+      false
+    );
     return [selectedElement, verbList];
   }
 
   modelDropdown() {
     if (!this.hasModelOptions) return [];
-    const models = this.models.filter((obj) => obj.module === this.selectedVerbType);
+    const models = this.models.filter(
+      (obj) => obj.module === this.selectedVerbType
+    );
     if (!Array.isArray(models) || models.length === 0) return [];
-    const inputPlaceHolder = this.el.querySelector('.icon-placeholder-input').parentElement.textContent;
+    const inputPlaceHolder = this.el.querySelector('.icon-placeholder-input')
+      .parentElement.textContent;
     const selectedModelType = models[0].id;
     const selectedModelVersion = models[0].version;
     const selectedModelModule = models[0].module;
-    const nameContainer = createTag('span', { class: 'model-name' }, models[0].name.trim());
-    const selectedElement = createTag('button', {
-      class: 'selected-model',
-      'aria-expanded': 'false',
-      'aria-controls': 'model-menu',
-      'aria-label': 'model type',
-      'aria-haspopup': 'listbox',
-      role: 'combobox',
-      'aria-labelledby': 'listbox-label',
-      'data-selected-model-id': selectedModelType,
-      'data-selected-model-version': selectedModelVersion,
-      'data-selected-model-module': selectedModelModule,
-    }, `<img src="${models[0].icon}" alt="" />${nameContainer.outerHTML}`);
+    const nameContainer = createTag(
+      'span',
+      { class: 'model-name' },
+      models[0].name.trim()
+    );
+    const selectedElement = createTag(
+      'button',
+      {
+        class: 'selected-model',
+        'aria-expanded': 'false',
+        'aria-controls': 'model-menu',
+        'aria-label': 'model type',
+        'aria-haspopup': 'listbox',
+        role: 'combobox',
+        'aria-labelledby': 'listbox-label',
+        'data-selected-model-id': selectedModelType,
+        'data-selected-model-version': selectedModelVersion,
+        'data-selected-model-module': selectedModelModule,
+      },
+      `<img src="${models[0].icon}" alt="" />${nameContainer.outerHTML}`
+    );
     this.selectedModelModule = selectedModelModule;
     this.selectedModelId = selectedModelType;
     this.selectedModelVersion = selectedModelVersion;
-    this.widgetWrap.setAttribute('data-selected-model-id', this.selectedModelId);
-    this.widgetWrap.setAttribute('data-selected-model-version', this.selectedModelVersion);
+    this.widgetWrap.setAttribute(
+      'data-selected-model-id',
+      this.selectedModelId
+    );
+    this.widgetWrap.setAttribute(
+      'data-selected-model-version',
+      this.selectedModelVersion
+    );
     this.widgetWrap.setAttribute('data-selected-verb', this.selectedVerbType);
     this.selectedModelText = models[0].name.trim();
-    const menuIcon = createTag('span', { class: 'menu-icon' }, '<svg><use xlink:href="#unity-chevron-icon"></use></svg>');
-    const listItems = createTag('ul', { class: 'verb-list', id: 'model-menu', role: 'listbox', 'aria-labelledby': 'listbox-label' });
+    const menuIcon = createTag(
+      'span',
+      { class: 'menu-icon' },
+      '<svg><use xlink:href="#unity-chevron-icon"></use></svg>'
+    );
+    const listItems = createTag('ul', {
+      class: 'verb-list',
+      id: 'model-menu',
+      role: 'listbox',
+      'aria-labelledby': 'listbox-label',
+    });
     listItems.setAttribute('style', 'display: none;');
     selectedElement.append(menuIcon);
     const handleDocumentClick = (e) => {
@@ -352,12 +522,16 @@ export default class UnityWidget {
         selectedElement.setAttribute('aria-expanded', 'false');
       }
     };
-    selectedElement.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.hidePromptDropdown(selectedElement);
-      this.showVerbMenu(selectedElement);
-      document.addEventListener('click', handleDocumentClick);
-    }, true);
+    selectedElement.addEventListener(
+      'click',
+      (e) => {
+        e.stopPropagation();
+        this.hidePromptDropdown(selectedElement);
+        this.showVerbMenu(selectedElement);
+        document.addEventListener('click', handleDocumentClick);
+      },
+      true
+    );
     selectedElement.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         this.hidePromptDropdown(selectedElement);
@@ -368,7 +542,14 @@ export default class UnityWidget {
         selectedElement.focus();
       }
     });
-    this.createDropdownItems(models, listItems, selectedElement, menuIcon, inputPlaceHolder, true);
+    this.createDropdownItems(
+      models,
+      listItems,
+      selectedElement,
+      menuIcon,
+      inputPlaceHolder,
+      true
+    );
     return [selectedElement, listItems];
   }
 
@@ -387,20 +568,36 @@ export default class UnityWidget {
     });
     const dropdown = this.widget.querySelector('.prompt-dropdown-container');
     inpField.addEventListener('focus', () => this.hidePromptDropdown());
-    inpField.addEventListener('click', () => this.resetAllSoundVariations?.(dropdown));
-    inpField.addEventListener('input', () => this.resetAllSoundVariations?.(dropdown));
+    inpField.addEventListener('click', () =>
+      this.resetAllSoundVariations?.(dropdown)
+    );
+    inpField.addEventListener('input', () =>
+      this.resetAllSoundVariations?.(dropdown)
+    );
     const verbDropdown = this.verbDropdown();
     const modelDropdown = this.modelDropdown();
-    const genBtn = this.createActBtn(this.el.querySelector('.icon-generate')?.closest('li'), 'gen-btn');
+    const genBtn = this.createActBtn(
+      this.el.querySelector('.icon-generate')?.closest('li'),
+      'gen-btn'
+    );
     actWrap.append(genBtn);
     const actionContainer = createTag('div', { class: 'action-container' });
-    const hasPromptLabel = this.el.querySelector('.icon-placeholder-prompt-label');
+    const hasPromptLabel = this.el.querySelector(
+      '.icon-placeholder-prompt-label'
+    );
     if (hasPromptLabel && ph['placeholder-prompt-label']) {
-      const promptLabel = createTag('label', { for: 'promptInput', class: 'inp-field-label' }, ph['placeholder-prompt-label']);
+      const promptLabel = createTag(
+        'label',
+        { for: 'promptInput', class: 'inp-field-label' },
+        ph['placeholder-prompt-label']
+      );
       inpWrap.appendChild(promptLabel);
     }
     if (verbDropdown.length > 1) {
-      const verbBtn = createTag('div', { class: 'verbs-container', 'aria-label': 'Media options' });
+      const verbBtn = createTag('div', {
+        class: 'verbs-container',
+        'aria-label': 'Media options',
+      });
       verbBtn.append(...verbDropdown);
       actionContainer.append(verbBtn);
       inpWrap.append(inpField, actionContainer, actWrap);
@@ -408,7 +605,10 @@ export default class UnityWidget {
       inpWrap.append(inpField, actWrap);
     }
     if (modelDropdown.length > 1) {
-      const modelBtn = createTag('div', { class: 'models-container', 'aria-label': 'Model options' });
+      const modelBtn = createTag('div', {
+        class: 'models-container',
+        'aria-label': 'Model options',
+      });
       modelBtn.append(...modelDropdown);
       actionContainer.append(modelBtn);
     }
@@ -434,21 +634,36 @@ export default class UnityWidget {
         tabindex: '0',
         'aria-label': prompt,
         'aria-description': `${placeholder['placeholder-prompt']} ${placeholder['placeholder-suggestions']}`,
-        'daa-ll': `${prompt.slice(0, 20)}--${this.selectedVerbType}--Prompt suggestion`,
+        'daa-ll': `${prompt.slice(0, 20)}--${
+          this.selectedVerbType
+        }--Prompt suggestion`,
       });
-      const iconWrap = createTag('span', { class: 'prompt-icon' }, '<svg><use xlink:href="#unity-prompt-icon"></use></svg>');
+      const iconWrap = createTag(
+        'span',
+        { class: 'prompt-icon' },
+        '<svg><use xlink:href="#unity-prompt-icon"></use></svg>'
+      );
       const text = createTag('span', { class: 'drop-text' }, prompt);
       item.append(iconWrap, text);
       dropdown.append(item);
       this.promptItems.push(item);
 
-      if (this.selectedVerbType === 'sound') this.addSoundSuggestionHandlers(dropdown, item, { prompt, variations }, idx + 1);
+      if (this.selectedVerbType === 'sound')
+        this.addSoundSuggestionHandlers(
+          dropdown,
+          item,
+          { prompt, variations },
+          idx + 1
+        );
     });
   }
 
   async genDropdown(ph) {
     if (!this.hasPromptSuggestions) return null;
-    const promptDropdownContainer = createTag('div', { class: 'prompt-dropdown-container drop hidden', 'aria-hidden': 'true' });
+    const promptDropdownContainer = createTag('div', {
+      class: 'prompt-dropdown-container drop hidden',
+      'aria-hidden': 'true',
+    });
     const dd = createTag('ul', {
       id: 'prompt-dropdown',
       class: 'prompt-suggestions-list',
@@ -457,7 +672,11 @@ export default class UnityWidget {
       'aria-labelledby': 'promptInput',
     });
     const titleCon = createTag('div', { class: 'drop-title-con' });
-    const title = createTag('span', { class: 'drop-title', id: 'prompt-suggestions' }, `${ph['placeholder-prompt']} ${ph['placeholder-suggestions']}`);
+    const title = createTag(
+      'span',
+      { class: 'drop-title', id: 'prompt-suggestions' },
+      `${ph['placeholder-prompt']} ${ph['placeholder-suggestions']}`
+    );
     titleCon.append(title);
     const prompts = await this.getPrompt(this.selectedVerbType);
     const limited = this.getLimitedDisplayPrompts(prompts);
@@ -465,14 +684,26 @@ export default class UnityWidget {
     promptDropdownContainer.append(titleCon, dd, this.createFooter(ph));
     if (!this.outsideDropdownHandler) {
       this.outsideDropdownHandler = (ev) => {
-        if (this.widgetWrap && window.getComputedStyle(this.widgetWrap).pointerEvents === 'none') return;
+        if (
+          this.widgetWrap &&
+          window.getComputedStyle(this.widgetWrap).pointerEvents === 'none'
+        )
+          return;
         const wrapper = this.widget.querySelector('.autocomplete');
         if (wrapper && wrapper.contains(ev.target)) return;
-        if (promptDropdownContainer && !promptDropdownContainer.classList.contains('hidden') && !promptDropdownContainer.contains(ev.target)) {
+        if (
+          promptDropdownContainer &&
+          !promptDropdownContainer.classList.contains('hidden') &&
+          !promptDropdownContainer.contains(ev.target)
+        ) {
           this.hidePromptDropdown();
         }
       };
-      setTimeout(() => document.addEventListener('click', this.outsideDropdownHandler, true), 0);
+      setTimeout(
+        () =>
+          document.addEventListener('click', this.outsideDropdownHandler, true),
+        0
+      );
     }
     return promptDropdownContainer;
   }
@@ -480,14 +711,36 @@ export default class UnityWidget {
   createFooter(ph) {
     const footer = createTag('div', { class: 'drop-footer' });
     const tipEl = this.el.querySelector('.icon-tip')?.closest('li');
-    const tipCon = createTag('div', { id: 'tip-content', class: 'tip-con', tabindex: '-1', role: 'note', 'aria-label': `${ph['placeholder-tip']} ${tipEl?.innerText}` }, '<svg><use xlink:href="#unity-info-icon"></use></svg>');
-    const tipText = createTag('span', { class: 'tip-text', id: 'tip-text' }, `${ph['placeholder-tip']}:`);
-    const tipDesc = createTag('span', { class: 'tip-desc', id: 'tip-desc' }, tipEl?.innerText || '');
+    const tipCon = createTag(
+      'div',
+      {
+        id: 'tip-content',
+        class: 'tip-con',
+        tabindex: '-1',
+        role: 'note',
+        'aria-label': `${ph['placeholder-tip']} ${tipEl?.innerText}`,
+      },
+      '<svg><use xlink:href="#unity-info-icon"></use></svg>'
+    );
+    const tipText = createTag(
+      'span',
+      { class: 'tip-text', id: 'tip-text' },
+      `${ph['placeholder-tip']}:`
+    );
+    const tipDesc = createTag(
+      'span',
+      { class: 'tip-desc', id: 'tip-desc' },
+      tipEl?.innerText || ''
+    );
     tipCon.append(tipText, tipDesc);
     const legalEl = this.el.querySelector('.icon-legal')?.closest('li');
     const legalCon = createTag('div', { class: 'legal-con' });
     const legalLink = legalEl?.querySelector('a');
-    const legalText = createTag('a', { href: legalLink?.href || '#', class: 'legal-text' }, legalLink?.innerText || 'Legal');
+    const legalText = createTag(
+      'a',
+      { href: legalLink?.href || '#', class: 'legal-text' },
+      legalLink?.innerText || 'Legal'
+    );
     legalCon.append(legalText);
     footer.append(tipCon, legalCon);
     return footer;
@@ -497,10 +750,20 @@ export default class UnityWidget {
     if (!cfg) return null;
     const txt = cfg.innerText?.trim();
     const img = cfg.querySelector('img[src*=".svg"]');
-    if (img) img.setAttribute('alt', `${txt?.split('\n')[0]} ${this.selectedVerbText}`);
-    const btn = createTag('a', { href: '#', class: `unity-act-btn ${cls}`, 'daa-ll': `Generate--${this.selectedVerbType}`, 'aria-label': `${txt?.split('\n')[0]} ${this.selectedVerbText}` });
+    if (img)
+      img.setAttribute(
+        'alt',
+        `${txt?.split('\n')[0]} ${this.selectedVerbText}`
+      );
+    const btn = createTag('a', {
+      href: '#',
+      class: `unity-act-btn ${cls}`,
+      'daa-ll': `Generate--${this.selectedVerbType}`,
+      'aria-label': `${txt?.split('\n')[0]} ${this.selectedVerbText}`,
+    });
     if (img) btn.append(createTag('div', { class: 'btn-ico' }, img));
-    if (txt) btn.append(createTag('div', { class: 'btn-txt' }, txt.split('\n')[0]));
+    if (txt)
+      btn.append(createTag('div', { class: 'btn-txt' }, txt.split('\n')[0]));
     this.genBtn = btn;
     return btn;
   }
@@ -509,7 +772,8 @@ export default class UnityWidget {
     const interactArea = this.target.querySelector('.copy');
     const para = interactArea?.querySelector(this.workflowCfg.targetCfg.target);
     this.widgetWrap.append(this.widget);
-    if (para && this.workflowCfg.targetCfg.insert === 'before') para.before(this.widgetWrap);
+    if (para && this.workflowCfg.targetCfg.insert === 'before')
+      para.before(this.widgetWrap);
     else if (para) para.after(this.widgetWrap);
     else interactArea?.appendChild(this.widgetWrap);
   }
@@ -517,12 +781,16 @@ export default class UnityWidget {
   async loadPrompts() {
     const { locale } = getConfig();
     const { origin } = window.location;
-    const baseUrl = (origin.includes('.aem.') || origin.includes('.hlx.'))
-      ? `https://main--unity--adobecom.${origin.includes('.hlx.') ? 'hlx' : 'aem'}.live`
-      : origin;
-    const promptFile = locale.prefix && locale.prefix !== '/'
-      ? `${baseUrl}${locale.prefix}/unity/configs/prompt/firefly-prompt.json`
-      : `${baseUrl}/unity/configs/prompt/firefly-prompt.json`;
+    const baseUrl =
+      origin.includes('.aem.') || origin.includes('.hlx.')
+        ? `https://main--unity--adobecom.${
+            origin.includes('.hlx.') ? 'hlx' : 'aem'
+          }.live`
+        : origin;
+    const promptFile =
+      locale.prefix && locale.prefix !== '/'
+        ? `${baseUrl}${locale.prefix}/unity/configs/prompt/firefly-prompt.json`
+        : `${baseUrl}/unity/configs/prompt/firefly-prompt.json`;
     const promptRes = await fetch(promptFile);
     if (!promptRes.ok) {
       throw new Error('Failed to fetch prompts.');
@@ -534,19 +802,28 @@ export default class UnityWidget {
   async getPrompt(verb) {
     if (!this.hasPromptSuggestions) return [];
     try {
-      if (!this.prompts || Object.keys(this.prompts).length === 0) await this.loadPrompts();
-      return (this.prompts?.[verb] || []).filter((item) => item.prompt && item.prompt.trim() !== '');
+      if (!this.prompts || Object.keys(this.prompts).length === 0)
+        await this.loadPrompts();
+      return (this.prompts?.[verb] || []).filter(
+        (item) => item.prompt && item.prompt.trim() !== ''
+      );
     } catch (e) {
-      window.lana?.log(`Message: Error loading promts, Error: ${e}`, this.lanaOptions);
+      window.lana?.log(
+        `Message: Error loading promts, Error: ${e}`,
+        this.lanaOptions
+      );
       return [];
     }
   }
 
   async loadModels() {
     const { origin } = window.location;
-    const baseUrl = (origin.includes('.aem.') || origin.includes('.hlx.'))
-      ? `https://main--unity--adobecom.${origin.includes('.hlx.') ? 'hlx' : 'aem'}.live`
-      : origin;
+    const baseUrl =
+      origin.includes('.aem.') || origin.includes('.hlx.')
+        ? `https://main--unity--adobecom.${
+            origin.includes('.hlx.') ? 'hlx' : 'aem'
+          }.live`
+        : origin;
     const modelFile = `${baseUrl}/unity/configs/prompt/model-picker.json`;
     const results = await fetch(modelFile);
     if (!results.ok) {
@@ -559,10 +836,14 @@ export default class UnityWidget {
   async getModel() {
     if (!this.hasModelOptions) return [];
     try {
-      if (!this.models || Object.keys(this.models).length === 0) await this.loadModels();
+      if (!this.models || Object.keys(this.models).length === 0)
+        await this.loadModels();
       return this.models;
     } catch (e) {
-      window.lana?.log(`Message: Error loading models, Error: ${e}`, this.lanaOptions);
+      window.lana?.log(
+        `Message: Error loading models, Error: ${e}`,
+        this.lanaOptions
+      );
       return [];
     }
   }
@@ -579,15 +860,29 @@ export default class UnityWidget {
             const ph = this.workflowCfg?.placeholder || {};
             const labels = Object.keys(ph)
               .filter((k) => k.startsWith('placeholder-variation-label-'))
-              .map((k) => ({ idx: Number.parseInt(k.split('-').pop(), 10), val: (ph[k] || '').trim() }))
+              .map((k) => ({
+                idx: Number.parseInt(k.split('-').pop(), 10),
+                val: (ph[k] || '').trim(),
+              }))
               .filter(({ idx, val }) => Number.isFinite(idx) && val)
               .sort((a, b) => a.idx - b.idx)
               .map(({ val }) => val);
-            const urls = (typeof item.variationUrls === 'string' ? item.variationUrls : '')
-              .split('||').map((s) => s.trim()).filter((s) => s);
-            variations = labels.map((lbl, idx) => ({ label: lbl, url: urls[idx] || '' }));
+            const urls = (
+              typeof item.variationUrls === 'string' ? item.variationUrls : ''
+            )
+              .split('||')
+              .map((s) => s.trim())
+              .filter((s) => s);
+            variations = labels.map((lbl, idx) => ({
+              label: lbl,
+              url: urls[idx] || '',
+            }));
           }
-          promptMap[item.verb].push({ prompt: item.prompt, assetid: item.assetid, variations });
+          promptMap[item.verb].push({
+            prompt: item.prompt,
+            assetid: item.assetid,
+            variations,
+          });
         }
       });
     }
@@ -600,7 +895,12 @@ export default class UnityWidget {
       data.forEach((item) => {
         if (item.type) {
           if (!modelMap[item.module]) modelMap[item.module] = [];
-          modelMap[item.module].push({ name: item.name, id: item.id, version: item.version, icon: item.icon });
+          modelMap[item.module].push({
+            name: item.name,
+            id: item.id,
+            version: item.version,
+            icon: item.icon,
+          });
         }
       });
     }
@@ -615,7 +915,13 @@ export default class UnityWidget {
     dropdown.querySelectorAll('.drop-item').forEach((item) => item.remove());
     const prompts = await this.getPrompt(verb);
     const limited = this.getLimitedDisplayPrompts(prompts);
-    this.addPromptItemsToDropdown(dropdown, limited, this.workflowCfg.placeholder);
-    this.widgetWrap.dispatchEvent(new CustomEvent('firefly-reinit-action-listeners'));
+    this.addPromptItemsToDropdown(
+      dropdown,
+      limited,
+      this.workflowCfg.placeholder
+    );
+    this.widgetWrap.dispatchEvent(
+      new CustomEvent('firefly-reinit-action-listeners')
+    );
   }
 }
